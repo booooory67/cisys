@@ -416,6 +416,42 @@ class SettingsResourceTest {
 
   @Test
   @TestSecurity(user = "admin", roles = "admin")
+  void customIntervalFlagTracksWhetherAnOverrideIsStored() {
+    try {
+      clearPolling();
+      given()
+          .get(POLLING)
+          .then()
+          .statusCode(200)
+          .body("intervalSeconds", equalTo(60), "customInterval", equalTo(false));
+      given()
+          .contentType("application/json")
+          .body(
+              "{\"enabled\":true,\"granularity\":\"PER_COMMIT\",\"scope\":\"WORKFLOW\",\"intervalSeconds\":120}")
+          .put(POLLING)
+          .then()
+          .statusCode(200)
+          .body("intervalSeconds", equalTo(120), "customInterval", equalTo(true));
+      given()
+          .get(POLLING)
+          .then()
+          .statusCode(200)
+          .body("intervalSeconds", equalTo(120), "customInterval", equalTo(true));
+      given()
+          .contentType("application/json")
+          .body(
+              "{\"enabled\":true,\"granularity\":\"PER_COMMIT\",\"scope\":\"WORKFLOW\",\"intervalSeconds\":null}")
+          .put(POLLING)
+          .then()
+          .statusCode(200)
+          .body("intervalSeconds", equalTo(60), "customInterval", equalTo(false));
+    } finally {
+      clearPolling();
+    }
+  }
+
+  @Test
+  @TestSecurity(user = "admin", roles = "admin")
   void clampsAConfiguredDefaultIntervalToTheAcceptedRange() {
     CommitPoller target = io.quarkus.arc.ClientProxy.unwrap(poller);
     java.time.Duration original = target.pollEvery;

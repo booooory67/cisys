@@ -75,7 +75,8 @@ public class SettingsResource {
       Settings.Granularity granularity,
       Settings.Scope scope,
       Integer intervalSeconds,
-      Boolean mirrorManualBuilds) {}
+      Boolean mirrorManualBuilds,
+      Boolean customInterval) {}
 
   /** Whether pull request and merge request builds are enabled. */
   public record PullRequests(Boolean enabled) {}
@@ -440,9 +441,7 @@ public class SettingsResource {
   @Path("/polling")
   public Polling polling() {
     requireAdmin();
-    Settings s = Settings.current();
-    return new Polling(
-        s.pollEnabled, s.pollGranularity, s.pollScope, effectiveInterval(s), s.mirrorManualBuilds);
+    return pollingResponse(Settings.current());
   }
 
   /** Saves the automatic-build settings. */
@@ -521,8 +520,7 @@ public class SettingsResource {
             previousMirror,
             "mirrorManualBuildsAfter",
             s.mirrorManualBuilds));
-    return new Polling(
-        s.pollEnabled, s.pollGranularity, s.pollScope, effectiveInterval(s), s.mirrorManualBuilds);
+    return pollingResponse(s);
   }
 
   /** The pull request build setting. */
@@ -583,6 +581,16 @@ public class SettingsResource {
                   "changed", changed));
         });
     return new PullRequests(input.enabled());
+  }
+
+  private Polling pollingResponse(Settings s) {
+    return new Polling(
+        s.pollEnabled,
+        s.pollGranularity,
+        s.pollScope,
+        effectiveInterval(s),
+        s.mirrorManualBuilds,
+        s.pollIntervalSeconds != null);
   }
 
   /** The stored interval, or the configured default so the form always has a number. */

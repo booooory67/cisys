@@ -58,8 +58,10 @@ export default function PollingPanel({ api }) {
           enabled: draft.enabled,
           granularity: draft.granularity,
           scope: draft.scope,
-          // Null keeps cisys.poll.every in charge; a value only when the admin changed it.
+          // Null keeps cisys.poll.every in charge when no custom interval was stored;
+          // once a custom interval is set, keep sending it unless the admin changes it.
           intervalSeconds:
+            !draft.customInterval &&
             String(draft.intervalSeconds) === String(savedInterval)
               ? null
               : Number(draft.intervalSeconds),

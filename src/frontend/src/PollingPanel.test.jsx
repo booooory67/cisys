@@ -133,6 +133,33 @@ describe("PollingPanel", () => {
     expect(body.intervalSeconds).toBeNull();
   });
 
+  it("preserves a saved custom interval when another field is changed", async () => {
+    const customSaved = {
+      ...SAVED,
+      intervalSeconds: 120,
+      customInterval: true,
+    };
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce(customSaved)
+      .mockResolvedValueOnce({ ...customSaved, enabled: false });
+    render(<PollingPanel api={api} />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Poll interval (seconds)").value).toBe(
+        "120",
+      ),
+    );
+
+    fireEvent.click(screen.getByLabelText("Automatic builds"));
+    fireEvent.submit(
+      screen.getByLabelText("Save automatic build settings").closest("form"),
+    );
+
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const body = JSON.parse(api.mock.calls[1][1].body);
+    expect(body.intervalSeconds).toBe(120);
+  });
+
   it("saves the manual build mirror choice", async () => {
     const api = vi
       .fn()
