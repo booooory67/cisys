@@ -35,7 +35,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.hibernate.exception.ConstraintViolationException;
 
 /** Teams, their members, and team-level management permissions. */
@@ -269,6 +271,35 @@ public class TeamResource {
     return TeamMember.<TeamMember>find("teamId = ?1 order by createdAt, id", id).list().stream()
         .map(member -> new MemberView(usernameOf(member.subject), member.role.name()))
         .toList();
+  }
+
+  /**
+   * Usernames of the enabled users that can still be added to the team, sorted; a team LEAD or
+   * global admin only.
+   */
+  @GET
+  @Path("/{id}/candidates")
+  public List<String> candidates(@PathParam("id") Long id) {
+    visible(id);
+    if (!access.isAdmin() && TeamMember.roleOf(id, access.subject()) != TeamRole.LEAD) {
+      throw new ForbiddenException();
+    }
+    Set<String> inTeam =
+        TeamMember.<TeamMember>find("teamId", id).list().stream()
+            .map(member -> member.subject)
+            .collect(Collectors.toSet());
+    try {
+      int total = directory.count(null);
+      return directory.search(null, 0, Math.max(total, 1)).stream()
+          .filter(UserDirectory.User::enabled)
+          .filter(user -> !inTeam.contains(user.id()))
+          .map(UserDirectory.User::username)
+          .sorted(String.CASE_INSENSITIVE_ORDER)
+          .toList();
+    } catch (UserDirectory.UnavailableException e) {
+      Log.warnf("User lookup failed: %s", e.getMessage());
+      throw problem(502, "The user directory is unavailable; try again later");
+    }
   }
 
   /** Adds a user as MEMBER by default; a team LEAD or global admin only. */

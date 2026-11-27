@@ -57,6 +57,7 @@ export default function TeamsPanel({ api, user }) {
   const [newName, setNewName] = useState("");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [candidates, setCandidates] = useState(null);
   const [memberRole, setMemberRole] = useState("MEMBER");
   const [token, setToken] = useState("");
   const [validationProject, setValidationProject] = useState("");
@@ -107,6 +108,27 @@ export default function TeamsPanel({ api, user }) {
     },
     [api],
   );
+
+  const loadCandidates = useCallback(
+    async (teamId) => {
+      setCandidates(null);
+      try {
+        setCandidates(await api(`/teams/${teamId}/candidates`));
+      } catch (e) {
+        setCandidates([]);
+        throw e;
+      }
+    },
+    [api],
+  );
+
+  /** Members and, for a team the caller manages, the users that can still join it. */
+  function refreshMembers(team) {
+    return Promise.all([
+      loadMembers(team.id),
+      canManage(team) ? loadCandidates(team.id) : undefined,
+    ]);
+  }
 
   useEffect(() => {
     loadTeams().catch((e) => {
@@ -168,7 +190,7 @@ export default function TeamsPanel({ api, user }) {
     setUsername("");
     setMemberRole("MEMBER");
     // Always refetch: another LEAD may have changed the team since it was last opened.
-    void run(() => loadMembers(team.id));
+    void run(() => refreshMembers(team));
   }
 
   function openToken(team) {
@@ -203,7 +225,7 @@ export default function TeamsPanel({ api, user }) {
       });
       setUsername("");
       setMemberRole("MEMBER");
-      await loadMembers(teamId);
+      await Promise.all([loadMembers(teamId), loadCandidates(teamId)]);
     });
   }
 
@@ -220,7 +242,7 @@ export default function TeamsPanel({ api, user }) {
     void run(() =>
       api(`/teams/${teamId}/members/${encodeURIComponent(member.username)}`, {
         method: "DELETE",
-      }).then(() => loadMembers(teamId)),
+      }).then(() => Promise.all([loadMembers(teamId), loadCandidates(teamId)])),
     );
   }
 
@@ -275,7 +297,7 @@ export default function TeamsPanel({ api, user }) {
         aria-label={t("teams.edit", { name: team.name })}
         data-selected="true"
       >
-        <div className="user-edit col-span-full w-full">
+        <div className="user-edit w-full">
           <div className="form-field">
             <Label htmlFor={`team-name-${team.id}`}>{t("teams.name")}</Label>
             <Input
@@ -289,136 +311,155 @@ export default function TeamsPanel({ api, user }) {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="members-list">
-            {members === null ? (
-              <p role="status">{t("teams.loadingMembers")}</p>
-            ) : Array.isArray(members) ? (
-              members.length === 0 ? (
-                <p className="field-hint">{t("teams.noMembers")}</p>
-              ) : (
-                members.map((member) => (
-                  <div className="member-row" key={member.username}>
-                    <span className="member-name">{member.username}</span>
-                    <Select
-                      value={member.role}
-                      disabled={busy}
-                      onValueChange={(role) =>
-                        changeRole(team.id, member, role)
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={t("teams.roleFor", {
-                          username: member.username,
-                        })}
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {t(
-                              role === "MEMBER"
-                                ? "teams.roleMember"
-                                : "teams.roleLead",
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="member-actions">
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="h-10 w-10"
-                        variant="outline"
+          <div className="form-field">
+            <Label>{t("teams.membersLabel")}</Label>
+            <div className="members-list">
+              {members === null ? (
+                <p role="status">{t("teams.loadingMembers")}</p>
+              ) : Array.isArray(members) ? (
+                members.length === 0 ? (
+                  <p className="field-hint">{t("teams.noMembers")}</p>
+                ) : (
+                  members.map((member) => (
+                    <div className="member-row" key={member.username}>
+                      <span className="member-name">{member.username}</span>
+                      <Select
+                        value={member.role}
                         disabled={busy}
-                        title={t("teams.remove")}
-                        aria-label={t("teams.removeMember", {
-                          username: member.username,
-                        })}
-                        onClick={() => removeMember(team.id, member)}
+                        onValueChange={(role) =>
+                          changeRole(team.id, member, role)
+                        }
                       >
-                        <Trash2 size={16} aria-hidden="true" />
-                      </Button>
+                        <SelectTrigger
+                          aria-label={t("teams.roleFor", {
+                            username: member.username,
+                          })}
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {t(
+                                role === "MEMBER"
+                                  ? "teams.roleMember"
+                                  : "teams.roleLead",
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="member-actions">
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-10 w-10"
+                          variant="outline"
+                          disabled={busy}
+                          title={t("teams.remove")}
+                          aria-label={t("teams.removeMember", {
+                            username: member.username,
+                          })}
+                          onClick={() => removeMember(team.id, member)}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )
-            ) : (
-              <p className="field-hint">{t("teams.errorLoadMembers")}</p>
-            )}
+                  ))
+                )
+              ) : (
+                <p className="field-hint">{t("teams.errorLoadMembers")}</p>
+              )}
+            </div>
           </div>
           {canManage(team) && (
-            <div className="member-add">
-              <Input
-                aria-label={t("teams.username")}
-                placeholder={t("teams.usernamePlaceholder")}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <Select value={memberRole} onValueChange={setMemberRole}>
-                <SelectTrigger
-                  aria-label={t("teams.newMemberRole")}
-                  className="w-full"
+            <div className="form-field">
+              <Label>{t("teams.addMember")}</Label>
+              <div className="member-add">
+                <Select
+                  value={username}
+                  onValueChange={setUsername}
+                  disabled={!candidates || candidates.length === 0}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {t(
-                        role === "MEMBER"
-                          ? "teams.roleMember"
-                          : "teams.roleLead",
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                size="icon"
-                className="h-10 w-10"
-                disabled={busy || !username.trim()}
-                title={t("teams.addMember")}
-                aria-label={t("teams.addMember")}
-                onClick={addMember}
-              >
-                <Plus size={16} aria-hidden="true" />
-              </Button>
+                  <SelectTrigger
+                    aria-label={t("teams.username")}
+                    className="member-user w-full"
+                  >
+                    <SelectValue
+                      placeholder={
+                        candidates === null
+                          ? t("teams.loadingCandidates")
+                          : candidates.length === 0
+                            ? t("teams.noCandidates")
+                            : t("teams.selectUser")
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(candidates || []).map((candidate) => (
+                      <SelectItem key={candidate} value={candidate}>
+                        {candidate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={memberRole} onValueChange={setMemberRole}>
+                  <SelectTrigger
+                    aria-label={t("teams.newMemberRole")}
+                    className="member-role w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {t(
+                          role === "MEMBER"
+                            ? "teams.roleMember"
+                            : "teams.roleLead",
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="icon"
+                  className="member-add-submit h-10 w-10"
+                  disabled={busy || !username.trim()}
+                  title={t("teams.addMember")}
+                  aria-label={t("teams.addMember")}
+                  onClick={addMember}
+                >
+                  <Plus size={16} aria-hidden="true" />
+                </Button>
+              </div>
             </div>
           )}
-          <div className="token-actions">
-            <span className="field-hint">
-              Member changes are saved immediately.
-            </span>
-            <div className="user-actions">
-              <span aria-hidden="true" />
-              <Button
-                type="submit"
-                size="icon"
-                className="h-10 w-10"
-                disabled={busy}
-                title={t("teams.saveTeam")}
-                aria-label={t("teams.save", { name: team.name })}
-              >
-                <Check size={16} aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="h-10 w-10"
-                disabled={busy}
-                title={t("teams.cancel")}
-                aria-label={t("teams.cancel")}
-                onClick={() => setMode(null)}
-              >
-                <X size={16} aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
+        </div>
+        <div className="user-actions">
+          <Button
+            type="submit"
+            size="icon"
+            disabled={busy}
+            title={t("teams.saveTeam")}
+            aria-label={t("teams.save", { name: team.name })}
+          >
+            <Check size={16} aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            disabled={busy}
+            title={t("teams.cancel")}
+            aria-label={t("teams.cancel")}
+            onClick={() => setMode(null)}
+          >
+            <X size={16} aria-hidden="true" />
+          </Button>
         </div>
       </form>
     );

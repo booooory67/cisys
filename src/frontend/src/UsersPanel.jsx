@@ -97,7 +97,9 @@ export default function UsersPanel({ api, user, tabs }) {
     void run(async () => {
       await api("/users", {
         method: "POST",
-        body: JSON.stringify({ ...draft, role: admin ? draft.role : "member" }),
+        body: JSON.stringify(
+          admin ? { ...draft, projectIds: [] } : { ...draft, role: "member" },
+        ),
       });
       setDraft(EMPTY);
       await load();
@@ -251,16 +253,20 @@ export default function UsersPanel({ api, user, tabs }) {
                   </Select>
                 </div>
               )}
-              <div className="form-field">
-                <Label>Projects</Label>
-                <ProjectPicker
-                  projects={projects}
-                  value={draft.projectIds}
-                  idPrefix="new-user-project"
-                  label="Projects for the new user"
-                  onChange={(projectIds) => setDraft({ ...draft, projectIds })}
-                />
-              </div>
+              {!admin && (
+                <div className="form-field">
+                  <Label>Projects</Label>
+                  <ProjectPicker
+                    projects={projects}
+                    value={draft.projectIds}
+                    idPrefix="new-user-project"
+                    label="Projects for the new user"
+                    onChange={(projectIds) =>
+                      setDraft({ ...draft, projectIds })
+                    }
+                  />
+                </div>
+              )}
               <Button
                 type="submit"
                 size="icon"
@@ -341,89 +347,124 @@ export default function UsersPanel({ api, user, tabs }) {
           ) : (
             page.users.map((u) =>
               editing?.id === u.id ? (
-                <form className="user-row" key={u.id} onSubmit={save}>
-                  <strong className="project-name">{u.username}</strong>
-                  {admin ? (
-                    <div className="user-edit">
+                <form
+                  className="user-row user-edit-row"
+                  key={u.id}
+                  onSubmit={save}
+                >
+                  <div className="user-edit w-full">
+                    <div className="form-field">
+                      <Label htmlFor={`user-${u.id}-username`}>User name</Label>
                       <Input
-                        aria-label="Email"
-                        type="email"
-                        maxLength="254"
-                        value={editing.email}
-                        onChange={(e) =>
-                          setEditing({ ...editing, email: e.target.value })
-                        }
+                        id={`user-${u.id}-username`}
+                        value={u.username}
+                        readOnly
+                        disabled
                       />
-                      <Input
-                        aria-label="First name"
-                        maxLength="100"
-                        value={editing.firstName}
-                        onChange={(e) =>
-                          setEditing({ ...editing, firstName: e.target.value })
-                        }
-                      />
-                      <Input
-                        aria-label="Last name"
-                        maxLength="100"
-                        value={editing.lastName}
-                        onChange={(e) =>
-                          setEditing({ ...editing, lastName: e.target.value })
-                        }
-                      />
-                      <Select
-                        value={editing.role || "none"}
-                        onValueChange={(value) =>
-                          setEditing({
-                            ...editing,
-                            role: value === "none" ? "" : value,
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          aria-label={`Role for ${u.username}`}
-                          className="w-full"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {editing.role === "" && (
-                            <SelectItem value="none">—</SelectItem>
-                          )}
-                          {ROLES.map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <label className="user-enabled">
-                        <input
-                          type="checkbox"
-                          checked={editing.enabled}
-                          onChange={(e) =>
-                            setEditing({
-                              ...editing,
-                              enabled: e.target.checked,
-                            })
-                          }
-                        />
-                        Enabled
-                      </label>
                     </div>
-                  ) : (
-                    <span />
-                  )}
-                  <ProjectPicker
-                    projects={projects}
-                    value={editing.projectIds}
-                    idPrefix={`user-${u.id}-project`}
-                    label={`Projects for ${u.username}`}
-                    onChange={(projectIds) =>
-                      setEditing({ ...editing, projectIds })
-                    }
-                  />
+                    {admin && (
+                      <>
+                        <div className="form-field">
+                          <Label htmlFor={`user-${u.id}-email`}>Email</Label>
+                          <Input
+                            id={`user-${u.id}-email`}
+                            type="email"
+                            maxLength="254"
+                            value={editing.email}
+                            onChange={(e) =>
+                              setEditing({ ...editing, email: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="form-field">
+                          <Label htmlFor={`user-${u.id}-first`}>
+                            First name
+                          </Label>
+                          <Input
+                            id={`user-${u.id}-first`}
+                            maxLength="100"
+                            value={editing.firstName}
+                            onChange={(e) =>
+                              setEditing({
+                                ...editing,
+                                firstName: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-field">
+                          <Label htmlFor={`user-${u.id}-last`}>Last name</Label>
+                          <Input
+                            id={`user-${u.id}-last`}
+                            maxLength="100"
+                            value={editing.lastName}
+                            onChange={(e) =>
+                              setEditing({
+                                ...editing,
+                                lastName: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-field">
+                          <Label htmlFor={`user-${u.id}-role`}>Role</Label>
+                          <Select
+                            value={editing.role || "none"}
+                            onValueChange={(value) =>
+                              setEditing({
+                                ...editing,
+                                role: value === "none" ? "" : value,
+                              })
+                            }
+                          >
+                            <SelectTrigger
+                              id={`user-${u.id}-role`}
+                              aria-label={`Role for ${u.username}`}
+                              className="w-full"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {editing.role === "" && (
+                                <SelectItem value="none">—</SelectItem>
+                              )}
+                              {ROLES.map((r) => (
+                                <SelectItem key={r} value={r}>
+                                  {r}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <label className="user-enabled">
+                          <input
+                            type="checkbox"
+                            checked={editing.enabled}
+                            onChange={(e) =>
+                              setEditing({
+                                ...editing,
+                                enabled: e.target.checked,
+                              })
+                            }
+                          />
+                          Enabled
+                        </label>
+                      </>
+                    )}
+                    <div className="form-field">
+                      <Label>Projects</Label>
+                      <ProjectPicker
+                        projects={projects}
+                        value={editing.projectIds}
+                        idPrefix={`user-${u.id}-project`}
+                        label={`Projects for ${u.username}`}
+                        onChange={(projectIds) =>
+                          setEditing({ ...editing, projectIds })
+                        }
+                      />
+                    </div>
+                  </div>
                   <div className="user-actions">
-                    <span aria-hidden="true" />
                     <Button
                       type="submit"
                       size="icon"

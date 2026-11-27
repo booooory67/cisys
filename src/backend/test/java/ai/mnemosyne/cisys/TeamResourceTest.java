@@ -9,6 +9,7 @@
 package ai.mnemosyne.cisys;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -233,6 +234,26 @@ class TeamResourceTest {
   void plainMemberCannotDeleteATeam() {
     Long id = team("lead-id", "member-id", ProjectMember.TeamRole.MEMBER);
     given().delete("/api/teams/" + id).then().statusCode(403);
+  }
+
+  @Test
+  @TestSecurity(user = "lead", roles = "lead")
+  @JwtSecurity(claims = @Claim(key = "sub", value = "lead-id"))
+  void candidatesExcludeTeamMembers() {
+    Long id = team("lead-id", "member-id", ProjectMember.TeamRole.MEMBER);
+    given()
+        .get("/api/teams/" + id + "/candidates")
+        .then()
+        .statusCode(200)
+        .body("$", contains("admin", "other", "outsider"));
+  }
+
+  @Test
+  @TestSecurity(user = "member", roles = "member")
+  @JwtSecurity(claims = @Claim(key = "sub", value = "member-id"))
+  void plainMemberCannotListCandidates() {
+    Long id = team("lead-id", "member-id", ProjectMember.TeamRole.MEMBER);
+    given().get("/api/teams/" + id + "/candidates").then().statusCode(403);
   }
 
   @Test

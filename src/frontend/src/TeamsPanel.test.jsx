@@ -81,6 +81,8 @@ function apiMock(calls, options = {}) {
     }
     if (path === "/teams/3/members" && !request.method)
       return [{ username: "lead", role: "LEAD" }];
+    if (path === "/teams/3/candidates" && !request.method)
+      return ["dev", "ops"];
     if (path === "/teams/3/token" && request.method === "PUT")
       return {
         set: true,
@@ -265,9 +267,10 @@ describe("TeamsPanel", () => {
       target: { value: "Platform team" },
     });
 
-    fireEvent.change(screen.getByLabelText("Username"), {
-      target: { value: "dev" },
-    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("Username").disabled).toBe(false),
+    );
+    await choose("Username", "dev");
     await choose("New member role", "lead");
     fireEvent.click(screen.getByRole("button", { name: "Add member" }));
     await waitFor(() =>
