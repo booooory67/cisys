@@ -528,7 +528,6 @@ function AppPage() {
               tab={projectTab}
               onTabChange={changeProjectTab}
               load={publicJson}
-              apiUrl={API}
               onOpenBuild={openBuild}
               onNotFound={showFrontPage}
             />
@@ -717,6 +716,7 @@ function AppPage() {
               key={settingsProject.id}
               project={settingsProject}
               api={api}
+              apiUrl={API}
               teams={teams}
               isAdmin={user.roles.includes("admin")}
               user={user}
@@ -754,7 +754,6 @@ function AppPage() {
             tab={projectTab}
             onTabChange={changeProjectTab}
             load={api}
-            apiUrl={API}
             onOpenBuild={openBuild}
             onBuild={canStartBuilds ? startBranchBuild : undefined}
             onNotFound={showFrontPage}

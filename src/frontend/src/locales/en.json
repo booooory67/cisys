@@ -62,8 +62,7 @@
     "teamNone": "No team",
     "teamLabel": "Project team",
     "teamOptional": "Team (optional)",
-    "teamAssignHint": "You must be a LEAD of the team to assign it.",
-    "teamChangeHint": "Changing a team is checked by the server against your project and team role."
+    "teamAssignHint": "You must be a LEAD of the team to assign it."
   },
   "settings": {
     "title": "Settings",

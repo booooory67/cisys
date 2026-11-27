@@ -7,7 +7,13 @@
  */
 
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import ProjectSettings from "./ProjectSettings";
 
@@ -64,6 +70,52 @@ function renderSettings(api, target = project(), isAdmin = false) {
     />,
   );
 }
+
+describe("ProjectSettings badge", () => {
+  it("copies badge Markdown for the default branch of a public project", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const api = vi.fn(async (path) =>
+      path === "/project-pages/cisys/branches"
+        ? { branches: ["feature", "main"] }
+        : [],
+    );
+    render(
+      <ProjectSettings
+        project={project()}
+        api={api}
+        apiUrl="https://ci.example/api"
+        isAdmin={false}
+        onSaved={() => {}}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy badge Markdown" }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `[![build](https://ci.example/api/badge/cisys/main.svg)](${window.location.origin}/cisys/)`,
+      ),
+    );
+  });
+
+  it("has no badge button for private projects", () => {
+    renderSettings(
+      vi.fn(async () => []),
+      {
+        ...project(),
+        privateRepository: true,
+      },
+    );
+    expect(
+      screen.queryByRole("button", { name: "Copy badge Markdown" }),
+    ).toBeNull();
+  });
+});
 
 describe("ProjectSettings", () => {
   it("shows the repository fields", () => {

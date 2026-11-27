@@ -7,16 +7,23 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { Save, X } from "lucide-react";
+import { Check, Copy, Save, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "./components/ui/card";
 import PageHeader from "./components/layout/PageHeader";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import ProjectMembers from "./ProjectMembers";
 import { diffMembers, toMap } from "./member-diff";
+import { badgeMarkdown } from "./build-format";
 
 const USERS_PAGE = 100;
 
@@ -29,6 +36,7 @@ const USERS_PAGE = 100;
 export default function ProjectSettings({
   project,
   api,
+  apiUrl = "",
   isAdmin,
   user,
   teams = [],
@@ -62,6 +70,7 @@ export default function ProjectSettings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [badgeCopied, setBadgeCopied] = useState(false);
 
   // Team data loads lazily, the first time the Team tab is opened.
   // `reloadMembers` re-triggers it after a load failure (e.g. bad connection).
@@ -153,6 +162,34 @@ export default function ProjectSettings({
 
   // Only admins can set a project credential, and only a private project can have one.
   const showCredential = isAdmin && priv;
+
+  // The badge points at the default branch: main, else master, else the first branch listed.
+  async function copyBadge() {
+    try {
+      const data = await api(
+        `/project-pages/${encodeURIComponent(repoSnapshot.name)}/branches`,
+      );
+      const branches = Array.isArray(data?.branches) ? data.branches : [];
+      const branch = branches.includes("main")
+        ? "main"
+        : branches.includes("master")
+          ? "master"
+          : branches[0];
+      if (!branch) throw new Error("no branches");
+      await navigator.clipboard.writeText(
+        badgeMarkdown(
+          apiUrl,
+          window.location.origin,
+          repoSnapshot.name,
+          branch,
+        ),
+      );
+      setBadgeCopied(true);
+      window.setTimeout(() => setBadgeCopied(false), 1500);
+    } catch {
+      setError("Unable to copy the badge Markdown.");
+    }
+  }
 
   function switchTab(next) {
     if (next === tab) return;
@@ -401,6 +438,24 @@ export default function ProjectSettings({
           <Card className="project-card">
             <CardHeader>
               <CardTitle>Repository</CardTitle>
+              {!repoSnapshot.privateRepository && (
+                <CardAction>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    title={badgeCopied ? "Copied" : "Copy badge Markdown"}
+                    aria-label="Copy badge Markdown"
+                    onClick={() => void copyBadge()}
+                  >
+                    {badgeCopied ? (
+                      <Check size={14} aria-hidden="true" />
+                    ) : (
+                      <Copy size={14} aria-hidden="true" />
+                    )}
+                  </Button>
+                </CardAction>
+              )}
             </CardHeader>
             <CardContent>
               <form
@@ -466,7 +521,6 @@ export default function ProjectSettings({
                         </option>
                       ))}
                   </select>
-                  <p className="field-hint">{t("projects.teamChangeHint")}</p>
                 </div>
                 {showCredential && (
                   <div className="form-field">
@@ -494,13 +548,8 @@ export default function ProjectSettings({
                       type="checkbox"
                       checked={cache}
                       onChange={(e) => setCache(e.target.checked)}
-                      aria-describedby="settings-cache-help"
                     />
                   </span>
-                  <p id="settings-cache-help" className="file-help">
-                    Keeps {"$HOME/.cisys/<project name>"} between builds; saved
-                    after passed builds, not pull requests.
-                  </p>
                 </div>
               </form>
             </CardContent>
