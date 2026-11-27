@@ -69,6 +69,8 @@ Trends only cover builds that retention has not deleted: the **Build retention**
 
 The export button downloads the same report, with the same filters, as a PDF. The PDF includes the rendered charts (build volume, success rate, durations, queue wait, the per-trigger split and the duration histogram) as well as the trend tables (volume per bucket, the duration histogram, the slowest projects and branches, and the flaky revisions) alongside the summary.
 
+The backend draws the charts with Java's AWT, so the backend host needs fontconfig and at least one installed font; without them the export fails. The chart labels use Red Hat Text, the typeface of the UI, when it is installed (on Fedora, `redhat-text-fonts`), and the system's sans-serif font otherwise.
+
 ## API
 
 | Method | Path                                                              | Result                   |

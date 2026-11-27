@@ -1,20 +1,27 @@
 name: main
-container: alpine:3.23
+container: fedora:44
 
 dependencies:
   - name: Java
-    value: openjdk25-jdk
+    value: java-25-openjdk-devel
+  # Maven built against the same JDK, so it does not pull in another one.
   - name: Maven
-    value: maven
+    value: maven-openjdk25
   - name: Node.js
-    value: nodejs
+    value: nodejs24
   - name: npm
-    value: npm
+    value: nodejs24-npm
   - name: PostgreSQL
-    value: postgresql18
+    value: postgresql-server
   # The schema uses the lo extension.
   - name: PostgreSQL extensions
-    value: postgresql18-contrib
+    value: postgresql-contrib
+  # The PDF reports draw their charts with AWT, which needs fontconfig and a font;
+  # the charts use Red Hat Text, as the UI does.
+  - name: Fontconfig
+    value: fontconfig
+  - name: Red Hat Text
+    value: redhat-text-fonts
 
 environment:
   - name: JAVA_HOME

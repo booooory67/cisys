@@ -21,12 +21,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.DoubleFunction;
@@ -52,6 +54,10 @@ public class BuildStatisticsPdf {
   private static final Font HEADING = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
   private static final Font HEAD = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
   private static final Font BODY = FontFactory.getFont(FontFactory.HELVETICA, 9);
+
+  /** The UI's typeface, used for the chart labels when the host has it installed. */
+  static final String CHART_FONT = "Red Hat Text";
+
   private static final Color HEAD_FILL = new Color(235, 235, 235);
   private static final DateTimeFormatter TIME =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
@@ -581,7 +587,7 @@ public class BuildStatisticsPdf {
     }
     double max = rawMax > 0 ? rawMax : 1;
 
-    java.awt.Font tickFont = new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 13);
+    java.awt.Font tickFont = new java.awt.Font(chartFamily(), java.awt.Font.PLAIN, 13);
     g.setFont(tickFont);
     var metrics = g.getFontMetrics();
     for (int i = 0; i <= 4; i++) {
@@ -684,5 +690,12 @@ public class BuildStatisticsPdf {
 
   private static String time(Instant at) {
     return at == null ? null : TIME.format(at);
+  }
+
+  /** {@value #CHART_FONT} when installed, else the JDK's sans-serif. */
+  static String chartFamily() {
+    String[] families =
+        GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT);
+    return Arrays.asList(families).contains(CHART_FONT) ? CHART_FONT : java.awt.Font.SANS_SERIF;
   }
 }
