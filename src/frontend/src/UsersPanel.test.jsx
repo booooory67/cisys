@@ -137,4 +137,82 @@ describe("UsersPanel", () => {
       });
     });
   });
+
+  function makePaginatedApi(count) {
+    let userList = Array.from({ length: count }, (_, idx) => ({
+      id: `u${idx + 1}`,
+      username: `user${idx + 1}`,
+      role: "member",
+      enabled: true,
+      manageable: true,
+      projects: [],
+    }));
+    return vi.fn((path, options) => {
+      if (path === "/users/projects") return Promise.resolve([]);
+      if (options?.method === "DELETE") {
+        const id = path.slice("/users/".length);
+        userList = userList.filter((u) => u.id !== id);
+        return Promise.resolve();
+      }
+      const params = new URLSearchParams(path.split("?")[1] || "");
+      const first = Number(params.get("first") || 0);
+      const max = Number(params.get("max") || 50);
+      return Promise.resolve({
+        total: userList.length,
+        users: userList.slice(first, first + max),
+      });
+    });
+  }
+
+  it("steps back to page 1 when the only user on page 2 is deleted", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      render(
+        <UsersPanel
+          api={makePaginatedApi(51)}
+          user={{ roles: ["admin"], subject: "admin" }}
+        />,
+      );
+
+      expect(await screen.findByText("user1")).toBeTruthy();
+      fireEvent.click(screen.getByLabelText("Next page"));
+      expect(await screen.findByText("user51")).toBeTruthy();
+      expect(screen.getByText("51–51 of 51")).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText("Delete user51"));
+
+      await waitFor(() => expect(screen.getByText("user1")).toBeTruthy());
+      expect(screen.queryByText("No users")).toBeNull();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("steps back cleanly from page 3 when deleting the last user leaves 100", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      render(
+        <UsersPanel
+          api={makePaginatedApi(101)}
+          user={{ roles: ["admin"], subject: "admin" }}
+        />,
+      );
+
+      expect(await screen.findByText("user1")).toBeTruthy();
+      fireEvent.click(screen.getByLabelText("Next page"));
+      expect(await screen.findByText("user51")).toBeTruthy();
+      fireEvent.click(screen.getByLabelText("Next page"));
+      expect(await screen.findByText("user101")).toBeTruthy();
+      expect(screen.getByText("101–101 of 101")).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText("Delete user101"));
+
+      await waitFor(() => expect(screen.getByText("user51")).toBeTruthy());
+      expect(screen.getByText("51–100 of 100")).toBeTruthy();
+      expect(screen.queryByText("101–100 of 100")).toBeNull();
+      expect(screen.queryByText("No users")).toBeNull();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
 });

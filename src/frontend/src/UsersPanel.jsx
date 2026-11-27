@@ -63,7 +63,16 @@ export default function UsersPanel({ api, user, tabs }) {
     if (search.trim()) query.set("search", search.trim());
     if (role) query.set("role", role);
     if (project) query.set("project", project);
-    setPage(await api(`/users?${query}`));
+    const data = await api(`/users?${query}`);
+    const lastPage = Math.max(
+      0,
+      Math.floor((data.total - 1) / PAGE_SIZE) * PAGE_SIZE,
+    );
+    if (data.users.length === 0 && lastPage < first) {
+      setFirst(lastPage);
+      return;
+    }
+    setPage(data);
   }, [api, first, search, role, project]);
 
   useEffect(() => {
@@ -579,7 +588,7 @@ export default function UsersPanel({ api, user, tabs }) {
               ),
             )
           )}
-          {total > PAGE_SIZE && (
+          {(total > PAGE_SIZE || first > 0) && (
             <div className="user-paging">
               <Button
                 type="button"
@@ -593,7 +602,8 @@ export default function UsersPanel({ api, user, tabs }) {
                 <ChevronLeft size={16} aria-hidden="true" />
               </Button>
               <span>
-                {first + 1}–{Math.min(first + PAGE_SIZE, total)} of {total}
+                {total === 0 ? 0 : Math.min(first + 1, total)}–
+                {Math.min(first + PAGE_SIZE, total)} of {total}
               </span>
               <Button
                 type="button"
